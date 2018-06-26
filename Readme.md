@@ -670,7 +670,19 @@ enron_df.loc[enron_df['check_total_payment_value'] == False][['salary','bonus','
 
 
 <div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
 
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -733,8 +745,19 @@ enron_df.loc[enron_df['check_total_stock_value'] == False][['exercised_stock_opt
 
 
 <div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
 
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
 
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -1348,8 +1371,6 @@ Em todos os algoritmos conseguimos um **recall** acima de 0.3, no entanto para o
 
 É interessante notar que o SVM, que teve tanto o **recall** quanto a **precisão** acima do valor de corte (0.3), teve um **F1 score** inferior ao do _Decisison Tree_. No caso, os 3 algoritmos tiveram um F1 score bem próximo.
 
-Acredito que seja possível obter um melhor resultado do que o apresentado acima. Embora o objetivo fosse obter um precisão e recall acima de 0.3, eu esperava obter um resultado bem melhor, com uma precisão de pelo menos 0.5.
-
 O _Decision Tree_ apresentou um bom recall de 0.65300, mas uma precisão inferior aos 0.3, objetivo deste trabalho. Isso ocorreu pelo alto número de falsos positivos. Isso traria um problema uma vez que apontaria como 'culpados' muitos dos funcionários que não estavam relacionados ao escandalo da Enron.
 
 No final, o algoritimo escolhido foi o Naive Bayes que teve um **F1** de 0.40481, apesar de ter apresentado um recall de apenas 0.3535. Abaixo todos os dados para o algoritimo selecionado:
@@ -1365,3 +1386,4 @@ No final, o algoritimo escolhido foi o Naive Bayes que teve um **F1** de 0.40481
 |Falsos positivos|786 |
 |Verdadeiros negativos| 1293|
 |Falsos negativos|12214 |
+ 
