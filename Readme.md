@@ -28,6 +28,7 @@ warnings.filterwarnings("ignore")
 
 from feature_format import featureFormat, targetFeatureSplit
 from tester import dump_classifier_and_data, test_classifier
+import classification as cl
 ```
 
     /Users/daniteo/miniconda3/envs/udacity2/lib/python2.7/site-packages/sklearn/cross_validation.py:41: DeprecationWarning: This module was deprecated in version 0.18 in favor of the model_selection module into which all the refactored classes and functions are moved. Also note that the interface of the new CV iterators are different from that of this module. This module will be removed in 0.20.
@@ -639,7 +640,7 @@ enron_df.drop(['TOTAL']).plot.scatter('salary','bonus', ax=axes[1], c='g')
 
 
 
-    <matplotlib.axes._subplots.AxesSubplot at 0x1110f09d0>
+    <matplotlib.axes._subplots.AxesSubplot at 0x11b79efd0>
 
 
 
@@ -959,11 +960,11 @@ Para a definição das melhores _features_ a serem usadas na predição dos POI'
 ```python
 best_features_and_score = fs.select_k_best(data_dict, features_list, 10)
 
-best_features = ['poi']
+best_features_original = ['poi']
 
 for feature in best_features_and_score:
     print "Feature: {:25} - Score: {}".format(feature[0], feature[1])
-    best_features.append(feature[0])
+    best_features_original.append(feature[0])
 ```
 
     Feature: total_stock_value         - Score: 22.5105490902
@@ -1017,6 +1018,75 @@ print best_features
 
 Com a inclusão das novas _features_, apenas aquelas de cunho financeiro foram selecionadas. Nenhuma característica relacionada a email foi mantida. As duas _features_ financeiras criadas (`total_revenue` e `bonus_ratio`) estão presentes entre as características selecionadas.
 
+Neste primeiro passo fizemos a seleção das características com um valor fixo de 10. Mas como saber se este o melhor parametro a ser usado. Para avaliarmos esta questão, farei a execução do algoritimo Naive Bayes com seus parametros base, considerando diversos valores para K (números de _features_ consideradas).
+
+
+```python
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+
+resultado = {'GaussianNB': [], 'DecisionTreeClassifier': []}
+classifiers = [GaussianNB(), DecisionTreeClassifier(random_state=42)]
+
+indices = range(2, 11) 
+
+for k in indices:
+    features_and_score_ = fs.select_k_best(data_dict, features_list_2, k)
+
+    # O vetor de melhores de caracteristicas é iniciado com 'poi' porque ele precisa ser o primeiro
+    # elemento para execução dos algoritimos
+    features_list_test = ['poi']
+
+    for feature in features_and_score_:
+        features_list_test.append(feature[0])
+        
+    for clf in classifiers:
+        classificador = str(clf).split('(')[0]
+        f1 = cl.classifier(clf, data_dict, features_list_test)
+        print "{} {} features - F1: {}".format(classificador, k, f1)
+
+        resultado[classificador].append(f1)
+        
+df_kbest = pd.DataFrame(resultado, index=indices)
+
+df_kbest.plot()
+
+```
+
+    GaussianNB 2 features - F1: 0.33988
+    DecisionTreeClassifier 2 features - F1: 0.1977
+    GaussianNB 3 features - F1: 0.40012
+    DecisionTreeClassifier 3 features - F1: 0.35192
+    GaussianNB 4 features - F1: 0.37339
+    DecisionTreeClassifier 4 features - F1: 0.3
+    GaussianNB 5 features - F1: 0.3526
+    DecisionTreeClassifier 5 features - F1: 0.26762
+    GaussianNB 6 features - F1: 0.3526
+    DecisionTreeClassifier 6 features - F1: 0.23521
+    GaussianNB 7 features - F1: 0.39284
+    DecisionTreeClassifier 7 features - F1: 0.23865
+    GaussianNB 8 features - F1: 0.38476
+    DecisionTreeClassifier 8 features - F1: 0.21945
+    GaussianNB 9 features - F1: 0.38034
+    DecisionTreeClassifier 9 features - F1: 0.25897
+    GaussianNB 10 features - F1: 0.3751
+    DecisionTreeClassifier 10 features - F1: 0.25993
+
+
+
+
+
+    <matplotlib.axes._subplots.AxesSubplot at 0x11b45e0d0>
+
+
+
+
+![png](output_39_2.png)
+
+
+Como podemos ver no gráfico acima, o melhor desempenho para o Naive Bayes ocorreu com 3, 7 e 8 features e para o Decision Tree com 3, 4 e 10 features. Durante a execução do algoritmio completo, utilizarei as opções de k no SelectKBest do pipeline a ser criado com base neste resultado.
+
+
 Vamos manter esta seleção de caracterísitcias para seleção do melhor algoritmo para identificação do **POI**.
 
 Para uma visão geral das caracteristicas disponíveis, vamos gerar um matrix de correlações.
@@ -1038,12 +1108,12 @@ sns.heatmap(corr,
 
 
 
-    <matplotlib.axes._subplots.AxesSubplot at 0x1114d3b10>
+    <matplotlib.axes._subplots.AxesSubplot at 0x11ba36590>
 
 
 
 
-![png](output_40_1.png)
+![png](output_42_1.png)
 
 
 ## Escolha e Afinamento de um Algorítmo
@@ -1123,13 +1193,13 @@ print "Tempo de execucao {} seg".format(uptime)
     	Accuracy: 0.76353	Precision: 0.24564	Recall: 0.37350	F1: 0.29637	F2: 0.33828
     	Total predictions: 15000	True positives:  747	False positives: 2294	False negatives: 1253	True negatives: 10706
     
-    Tempo de execucao 1.60532402992 seg
+    Tempo de execucao 2.54097700119 seg
     ----- Features selecionadas -----
     GaussianNB(priors=None)
     	Accuracy: 0.84940	Precision: 0.41981	Recall: 0.33900	F1: 0.37510	F2: 0.35257
     	Total predictions: 15000	True positives:  678	False positives:  937	False negatives: 1322	True negatives: 12063
     
-    Tempo de execucao 1.4920630455 seg
+    Tempo de execucao 2.16269302368 seg
 
 
 Acima comparamos o resultado de um dos algoritimos (Naive Bayes) com as todas as features originais e com as features selecionadas pelo `SelectKBest`. Utilizamos as opções padrões do Naive Bayes nesta comparação.
@@ -1162,10 +1232,10 @@ print "Tempo de execucao {} seg".format(uptime)
                 min_samples_leaf=1, min_samples_split=2,
                 min_weight_fraction_leaf=0.0, presort=False, random_state=None,
                 splitter='best')
-    	Accuracy: 0.79767	Precision: 0.23089	Recall: 0.22200	F1: 0.22636	F2: 0.22372
-    	Total predictions: 15000	True positives:  444	False positives: 1479	False negatives: 1556	True negatives: 11521
+    	Accuracy: 0.79740	Precision: 0.22957	Recall: 0.22050	F1: 0.22494	F2: 0.22226
+    	Total predictions: 15000	True positives:  441	False positives: 1480	False negatives: 1559	True negatives: 11520
     
-    Tempo de execucao 1.62816810608 seg
+    Tempo de execucao 2.12328195572 seg
 
 
 
@@ -1184,10 +1254,10 @@ print "Tempo de execucao {} seg".format(uptime)
     KMeans(algorithm='auto', copy_x=True, init='k-means++', max_iter=300,
         n_clusters=2, n_init=10, n_jobs=1, precompute_distances='auto',
         random_state=None, tol=0.0001, verbose=0)
-    	Accuracy: 0.83007	Precision: 0.20516	Recall: 0.09550	F1: 0.13033	F2: 0.10693
-    	Total predictions: 15000	True positives:  191	False positives:  740	False negatives: 1809	True negatives: 12260
+    	Accuracy: 0.83340	Precision: 0.21289	Recall: 0.09250	F1: 0.12896	F2: 0.10430
+    	Total predictions: 15000	True positives:  185	False positives:  684	False negatives: 1815	True negatives: 12316
     
-    Tempo de execucao 15.1649539471 seg
+    Tempo de execucao 22.8626818657 seg
 
 
 
@@ -1208,7 +1278,7 @@ print "Tempo de execucao {} seg".format(uptime)
       max_iter=-1, probability=False, random_state=None, shrinking=True,
       tol=0.001, verbose=False)
     Precision or recall may be undefined due to a lack of true positive predicitons.
-    Tempo de execucao 1.86995220184 seg
+    Tempo de execucao 2.28000593185 seg
 
 
 Podemos observar os seguintes resultados, conforme apresentado na saída do método *test_classifier*:
@@ -1243,10 +1313,10 @@ print "Tempo de execucao {} seg".format(uptime)
                 min_samples_leaf=1, min_samples_split=2,
                 min_weight_fraction_leaf=0.0, presort=False, random_state=None,
                 splitter='best')
-    	Accuracy: 0.79987	Precision: 0.26589	Recall: 0.28450	F1: 0.27488	F2: 0.28057
-    	Total predictions: 15000	True positives:  569	False positives: 1571	False negatives: 1431	True negatives: 11429
+    	Accuracy: 0.80013	Precision: 0.26682	Recall: 0.28550	F1: 0.27585	F2: 0.28156
+    	Total predictions: 15000	True positives:  571	False positives: 1569	False negatives: 1429	True negatives: 11431
     
-    Tempo de execucao 1.38525700569 seg
+    Tempo de execucao 2.21025419235 seg
 
 
 | Classificador| Precisão  | Recall | Acuracia | F1   |
@@ -1262,16 +1332,54 @@ Para trabalharmos com os algortimos selecionados farei uso de _Pipeline_ pra ele
 
 Os algortimitos utilizados e as opções utilizadas no _GridSearchCV_ podem ser encontrados no arquivo `classification.py`.
 
+### Validação
+
+No pipelina usado será considerada uma etapa de validação usando o método _StratifiedKFold_, como pode ser visto no método `run_classifier` do sript `classification.py`
+
+A validação busca resolver problemas na definição das separação dos dados de treinamento e teste, uma vez que a parte de dados usada para treinar o algoritimo é perdida na execução na base de teste. Ela consiste em se realizar uma série de execuções do algoritmo com variações entre os dados de treinamento e testes, evitando assim que um sobreajuste do nosso algoritimo.
+
+Embora a validação traga um aumento no tempo de execução dos algoritimos, temos como vantagem um melhora no precisão dos mesmos.
+
 
 ```python
-import classification as cl
+cl.decision_tree_classifier(data_dict, best_features, [3, 4, 5, 7, 8, 10])
+```
 
+    ===== Decision Trees =====
+    Pipeline(memory=None,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=8, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
+      svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...        min_weight_fraction_leaf=0.0, presort=False, random_state=42,
+                splitter='best'))])
+    	Accuracy: 0.76987	Precision: 0.28106	Recall: 0.46600	F1: 0.35064	F2: 0.41181
+    	Total predictions: 15000	True positives:  932	False positives: 2384	False negatives: 1068	True negatives: 10616
+    
+
+
+
+
+
+    (Pipeline(memory=None,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=8, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
+       svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...        min_weight_fraction_leaf=0.0, presort=False, random_state=42,
+                 splitter='best'))]),
+     {'classifier__class_weight': 'balanced',
+      'classifier__criterion': 'gini',
+      'classifier__max_features': 'sqrt',
+      'classifier__min_samples_split': 8,
+      'classifier__splitter': 'best',
+      'reducer__n_components': 1,
+      'selector__k': 8})
+
+
+
+
+```python
 cl.decision_tree_classifier(data_dict, best_features)
 ```
 
     ===== Decision Trees =====
     Pipeline(memory=None,
-         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=5, score_func=<function f_classif at 0x1111c87d0>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=5, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
       svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...      min_weight_fraction_leaf=0.0, presort=False, random_state=42,
                 splitter='random'))])
     	Accuracy: 0.74227	Precision: 0.29165	Recall: 0.65300	F1: 0.40321	F2: 0.52332
@@ -1283,7 +1391,7 @@ cl.decision_tree_classifier(data_dict, best_features)
 
 
     (Pipeline(memory=None,
-          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=5, score_func=<function f_classif at 0x1111c87d0>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=5, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
        svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...      min_weight_fraction_leaf=0.0, presort=False, random_state=42,
                  splitter='random'))]),
      {'classifier__class_weight': 'balanced',
@@ -1296,6 +1404,57 @@ cl.decision_tree_classifier(data_dict, best_features)
 
 
 
+Durante a execução dos algoritmos notei um comportamento inesperado. Embora o _GridSearchCV_ esteja preparado para utilizar o _F1 Score_ para definição dos melhores parametros para execução, notamos no resultado dos algorimos acima que isto não ocorreu para o _Decision Tree_.
+
+Neste caso o parametro utilizado foi a acurácia.
+
+Abaixo o método de execução do classificador. Note o paramento `scoring=f1` no _GridSearchCV_:
+
+```python
+def run_classifier(pipe, params, dataset, feature_list):
+    cv_split = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+    tree_grid = GridSearchCV(pipe, params, scoring='f1', cv=cv_split)
+
+    data = featureFormat(dataset, feature_list, sort_keys=True)
+    labels, features = targetFeatureSplit(data)
+
+    tree_grid.fit(features, labels)
+
+    test_classifier(tree_grid.best_estimator_, dataset, feature_list)
+
+    return tree_grid.best_estimator_, tree_grid.best_params_
+
+```
+O mesmo ocorreu com o SVM. Por conta desse comportamento decidi manter um relação reduzida de valores de **K**. 
+
+
+```python
+cl.naive_bayes_classifier(data_dict, best_features)
+```
+
+    ===== Naive Bayes =====
+    Pipeline(memory=None,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=2, random_state=42,
+      svd_solver='auto', tol=0.0, whiten=False)), ('classifier', GaussianNB(priors=None))])
+    	Accuracy: 0.86140	Precision: 0.47354	Recall: 0.35350	F1: 0.40481	F2: 0.37238
+    	Total predictions: 15000	True positives:  707	False positives:  786	False negatives: 1293	True negatives: 12214
+    
+    {'reducer__n_components': 2, 'selector__k': 10, 'scaler': StandardScaler(copy=True, with_mean=True, with_std=True)}
+
+
+
+
+
+    (Pipeline(memory=None,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=2, random_state=42,
+       svd_solver='auto', tol=0.0, whiten=False)), ('classifier', GaussianNB(priors=None))]),
+     {'reducer__n_components': 2,
+      'scaler': StandardScaler(copy=True, with_mean=True, with_std=True),
+      'selector__k': 10})
+
+
+
 
 ```python
 cl.svm_classifier(data_dict, best_features)
@@ -1303,7 +1462,7 @@ cl.svm_classifier(data_dict, best_features)
 
     ===== SVM =====
     Pipeline(memory=None,
-         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x1111c87d0>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
       svd_solver='auto', tol=0.0, whiten=False)), ('classifier'...d',
       max_iter=-1, probability=False, random_state=42, shrinking=True,
       tol=0.001, verbose=False))])
@@ -1316,7 +1475,7 @@ cl.svm_classifier(data_dict, best_features)
 
 
     (Pipeline(memory=None,
-          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x1111c87d0>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=1, random_state=42,
        svd_solver='auto', tol=0.0, whiten=False)), ('classifier'...d',
        max_iter=-1, probability=False, random_state=42, shrinking=True,
        tol=0.001, verbose=False))]),
@@ -1330,36 +1489,119 @@ cl.svm_classifier(data_dict, best_features)
 
 
 
+Para efeito de comparação, executarei os algoritmos acima também com as características escolhidas a partir das _features_ originais, sem considerar as criadas durante este trabalho.
+
 
 ```python
-cl.naive_bayes_classifier(data_dict, best_features)
+cl.naive_bayes_classifier(data_dict, best_features_original)
 ```
 
     ===== Naive Bayes =====
     Pipeline(memory=None,
-         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x1111c87d0>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=2, random_state=42,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=4, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=2, random_state=42,
       svd_solver='auto', tol=0.0, whiten=False)), ('classifier', GaussianNB(priors=None))])
-    	Accuracy: 0.86140	Precision: 0.47354	Recall: 0.35350	F1: 0.40481	F2: 0.37238
-    	Total predictions: 15000	True positives:  707	False positives:  786	False negatives: 1293	True negatives: 12214
+    	Accuracy: 0.85640	Precision: 0.43689	Recall: 0.26650	F1: 0.33106	F2: 0.28905
+    	Total predictions: 15000	True positives:  533	False positives:  687	False negatives: 1467	True negatives: 12313
     
-    {'reducer__n_components': 2, 'selector__k': 10, 'scaler': StandardScaler(copy=True, with_mean=True, with_std=True)}
+    {'reducer__n_components': 2, 'selector__k': 4, 'scaler': StandardScaler(copy=True, with_mean=True, with_std=True)}
 
 
 
 
 
     (Pipeline(memory=None,
-          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=10, score_func=<function f_classif at 0x1111c87d0>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=2, random_state=42,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=4, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=2, random_state=42,
        svd_solver='auto', tol=0.0, whiten=False)), ('classifier', GaussianNB(priors=None))]),
      {'reducer__n_components': 2,
       'scaler': StandardScaler(copy=True, with_mean=True, with_std=True),
-      'selector__k': 10})
+      'selector__k': 4})
 
+
+
+
+```python
+cl.decision_tree_classifier(data_dict, best_features_original)
+```
+
+    ===== Decision Trees =====
+    Pipeline(memory=None,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=4, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=3, random_state=42,
+      svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...        min_weight_fraction_leaf=0.0, presort=False, random_state=42,
+                splitter='best'))])
+    	Accuracy: 0.74993	Precision: 0.23494	Recall: 0.38800	F1: 0.29266	F2: 0.34327
+    	Total predictions: 15000	True positives:  776	False positives: 2527	False negatives: 1224	True negatives: 10473
+    
+
+
+
+
+
+    (Pipeline(memory=None,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=4, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=3, random_state=42,
+       svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...        min_weight_fraction_leaf=0.0, presort=False, random_state=42,
+                 splitter='best'))]),
+     {'classifier__class_weight': 'balanced',
+      'classifier__criterion': 'entropy',
+      'classifier__max_features': 'sqrt',
+      'classifier__min_samples_split': 8,
+      'classifier__splitter': 'best',
+      'reducer__n_components': 3,
+      'selector__k': 4})
+
+
+
+
+```python
+cl.svm_classifier(data_dict, best_features_original)
+```
+
+    ===== SVM =====
+    Pipeline(memory=None,
+         steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=5, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=3, random_state=42,
+      svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...d',
+      max_iter=-1, probability=False, random_state=42, shrinking=True,
+      tol=0.001, verbose=False))])
+    	Accuracy: 0.67373	Precision: 0.23956	Recall: 0.66550	F1: 0.35230	F2: 0.49093
+    	Total predictions: 15000	True positives: 1331	False positives: 4225	False negatives:  669	True negatives: 8775
+    
+
+
+
+
+
+    (Pipeline(memory=None,
+          steps=[('scaler', StandardScaler(copy=True, with_mean=True, with_std=True)), ('selector', SelectKBest(k=5, score_func=<function f_classif at 0x11ac63a28>)), ('reducer', PCA(copy=True, iterated_power='auto', n_components=3, random_state=42,
+       svd_solver='auto', tol=0.0, whiten=False)), ('classifier',...d',
+       max_iter=-1, probability=False, random_state=42, shrinking=True,
+       tol=0.001, verbose=False))]),
+     {'classifier__C': 100,
+      'classifier__class_weight': 'balanced',
+      'classifier__gamma': 0.05,
+      'classifier__kernel': 'sigmoid',
+      'reducer__n_components': 3,
+      'scaler': StandardScaler(copy=True, with_mean=True, with_std=True),
+      'selector__k': 5})
+
+
+
+Podemos perceber através do _F1 Score_ que, para todos os algoritmos executados, a execução sem as novas _features_ tiveram um resultado pior.
+
+
+```python
+data    = {'Features originais': [0.29266, 0.35230,  0.33106] , 
+           'Com novas features': [0.40321, 0.40061, 0.40481]}
+indices = ['Decision Tree', 'SVM', 'Naive Bayes']
+
+df_features = pd.DataFrame(data, index=indices)
+
+df_features.plot.bar();
+```
+
+
+![png](output_63_0.png)
 
 
 ## Conclusão
-
-
 
 Em todos os algoritmos conseguimos um **recall** acima de 0.3, no entanto para o algoritimo de _Decision Trees_ tivemos um **precisão** inferior, 0.29165, o que faz que ele seja descartado como algortimo escolhido, mesmo sendo este o algoritimo com maior **recall**: 0.65300.
 
@@ -1372,6 +1614,8 @@ Em todos os algoritmos conseguimos um **recall** acima de 0.3, no entanto para o
 É interessante notar que o SVM, que teve tanto o **recall** quanto a **precisão** acima do valor de corte (0.3), teve um **F1 score** inferior ao do _Decisison Tree_. No caso, os 3 algoritmos tiveram um F1 score bem próximo.
 
 O _Decision Tree_ apresentou um bom recall de 0.65300, mas uma precisão inferior aos 0.3, objetivo deste trabalho. Isso ocorreu pelo alto número de falsos positivos. Isso traria um problema uma vez que apontaria como 'culpados' muitos dos funcionários que não estavam relacionados ao escandalo da Enron.
+
+### Algoritmo escolhido
 
 No final, o algoritimo escolhido foi o Naive Bayes que teve um **F1** de 0.40481, apesar de ter apresentado um recall de apenas 0.3535. Abaixo todos os dados para o algoritimo selecionado:
 
